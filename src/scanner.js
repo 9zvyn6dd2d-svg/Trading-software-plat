@@ -122,6 +122,7 @@ export async function runScan({ market, floats, criteria, watchlist = [], staleA
       changePct: r.changePct,
       ...volumeFields(r),
       float: floatInfo?.shares ?? null,
+      sharesOutstanding: floatInfo?.outstanding ?? null,
       floatAsOf: floatInfo?.asOf ?? null,
       news: news ? news.get(r.symbol) ?? [] : null,
       lastTradeAt: r.lastTradeAt,

@@ -18,6 +18,15 @@ function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 }
 
+// Float when known; otherwise shares outstanding, which is an upper bound on float.
+function floatCell(r) {
+  if (r.float !== null) return fmtNum(r.float);
+  if (r.sharesOutstanding != null) {
+    return `<span title="Float not available on the free FMP plan. Shares outstanding shown; float is at most this.">≤${fmtNum(r.sharesOutstanding)}</span><div class="muted">outstanding</div>`;
+  }
+  return fmtNum(null);
+}
+
 function fmtNum(n) {
   if (n === null || n === undefined || !Number.isFinite(n)) return '<span class="unknown">n/a</span>';
   if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
@@ -104,14 +113,14 @@ function renderRows() {
       const age = serverNow() - r.lastTradeAt;
       const stale = age > latest.staleAfterMs;
       const isNew = newSymbols.has(r.symbol) && Date.now() - newSymbols.get(r.symbol) < 5 * 60_000;
-      const floatNote = r.float !== null && r.float <= latest.criteria.preferredFloat ? ' title="Under preferred float"' : '';
+      const floatNote = r.preferredFloat ? ' title="Under preferred float"' : '';
       return `<tr class="${r.allMet ? 'all-met' : ''} ${stale ? 'stale' : ''}">
         <td><span class="sym">${esc(r.symbol)}</span>${isNew ? '<span class="new">NEW</span>' : ''}</td>
         <td class="num">${stale ? '<span class="unknown">stale</span>' : '$' + r.price.toFixed(r.price < 1 ? 4 : 2)}</td>
         <td class="num up">${stale ? '—' : '+' + r.changePct.toFixed(1) + '%'}</td>
         <td class="num">${fmtNum(r.volume)}</td>
         <td class="num">${r.rvol === null ? '<span class="unknown">n/a</span>' : r.rvol.toFixed(1) + 'x'}</td>
-        <td class="num"${floatNote}>${fmtNum(r.float)}</td>
+        <td class="num"${floatNote}>${floatCell(r)}</td>
         <td class="news">${newsCell(r)}</td>
         <td>${pillarCell(r)}</td>
         <td>${fmtTime(r.lastTradeAt)}<div class="${stale ? 'age-stale' : 'muted'}">${stale ? 'STALE · ' : ''}${fmtAge(age)}</div></td>

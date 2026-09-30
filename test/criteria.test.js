@@ -37,3 +37,11 @@ test('ranks by pillars met, then by % change', () => {
   ]);
   assert.deepEqual(ranked.map((r) => r.symbol), ['B', 'C', 'A']);
 });
+
+test('float pillar: small shares outstanding proves a small float, large proves nothing', () => {
+  const base = { price: 4.5, changePct: 35, rvol: 12, news: [], float: null };
+  assert.equal(evaluatePillars({ ...base, sharesOutstanding: 8e6 }, criteria).pillars.float, true);
+  assert.equal(evaluatePillars({ ...base, sharesOutstanding: 8e6 }, criteria).preferredFloat, true);
+  assert.equal(evaluatePillars({ ...base, sharesOutstanding: 60e6 }, criteria).pillars.float, null);
+  assert.equal(evaluatePillars({ ...base, float: 30e6, sharesOutstanding: 8e6 }, criteria).pillars.float, false);
+});

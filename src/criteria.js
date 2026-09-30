@@ -13,7 +13,12 @@ export function evaluatePillars(stock, criteria) {
   const change = known(stock.changePct) ? stock.changePct >= criteria.minChangePct : null;
   const rvol = known(stock.rvol) ? stock.rvol >= criteria.minRvol : null;
   const news = Array.isArray(stock.news) ? stock.news.length > 0 : null;
-  const float = known(stock.float) ? stock.float <= criteria.maxFloat : null;
+  // Float is at most shares outstanding, so a small outstanding count proves a
+  // small float when the float itself isn't available. A large one proves nothing.
+  const floatCap = known(stock.float) ? stock.float : known(stock.sharesOutstanding) ? stock.sharesOutstanding : null;
+  const float = known(stock.float)
+    ? stock.float <= criteria.maxFloat
+    : floatCap !== null && floatCap <= criteria.maxFloat ? true : null;
 
   const pillars = { price, change, rvol, news, float };
   const met = PILLARS.filter((p) => pillars[p] === true).length;
@@ -21,7 +26,7 @@ export function evaluatePillars(stock, criteria) {
     pillars,
     met,
     allMet: met === PILLARS.length,
-    preferredFloat: known(stock.float) && stock.float <= criteria.preferredFloat,
+    preferredFloat: floatCap !== null && floatCap <= criteria.preferredFloat,
   };
 }
 

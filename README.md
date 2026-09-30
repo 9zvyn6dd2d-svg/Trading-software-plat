@@ -29,7 +29,7 @@ Below the five-pillar scan, a second table lists up to 25 stocks in the price ra
 
 ## Refresh rate
 
-Everything (prices, % change, volume, relative volume, news, both tables) refreshes every `SCAN_INTERVAL_SECONDS`, default **3 seconds**, and is pushed to the page as it comes in. Float is looked up once a day per stock because it doesn't change intraday, and the 30-day average volume is also computed once a day. If FMP refuses a float lookup (for example, a stock its free plan doesn't cover), that stock is not asked for again for 15 minutes, and a rate-limit answer pauses all float lookups for 15 minutes, so failures can't use up the 250 free lookups a day.
+Everything (prices, % change, volume, relative volume, news, both tables) refreshes every `SCAN_INTERVAL_SECONDS`, default **3 seconds**, and is pushed to the page as it comes in. Float is looked up once a day per stock because it doesn't change intraday, and the 30-day average volume is also computed once a day. If a float lookup fails (both the float and the profile request), that stock is not asked for again for 15 minutes, and a rate-limit answer pauses all float lookups for 15 minutes, so failures can't use up the 250 free lookups a day.
 
 Alpaca's free plan allows 200 requests a minute. A 3-second scan uses about 100 to 140 a minute in normal conditions (up to about 170 in a busy pre-market), and the current rate is shown at the bottom of the page. If Alpaca ever answers "rate limit reached", the page says data is unavailable, the scanner waits 15 seconds before trying again, and you can raise `SCAN_INTERVAL_SECONDS`.
 
@@ -39,6 +39,8 @@ Requires Node.js 22 or newer. There are no npm dependencies.
 
 1. **Get an Alpaca market data key (required).** Create a free account at [alpaca.markets](https://alpaca.markets). In the dashboard, switch to Paper Trading, find **API Keys** on the home page and click **Generate New Keys**. Copy both the key and the secret (the secret is shown only once).
 2. **Get a Financial Modeling Prep key (optional, for float).** Sign up at [financialmodelingprep.com](https://site.financialmodelingprep.com/developer/docs) and copy your API key from the dashboard. Without it, the float pillar shows "?".
+
+   FMP's free plan only returns float for a few large caps and refuses small caps (HTTP 402). For those, the scanner falls back to FMP's free company profile and works out shares outstanding (market cap / price). Float is never more than shares outstanding, so outstanding under `MAX_FLOAT` counts as a pass and the Float column shows it as "≤X outstanding". Above that the pillar stays "?". A paid FMP plan returns the real float and is used automatically.
 3. Copy `.env.example` to `.env` and paste the keys in:
    ```
    ALPACA_API_KEY=your-key-id
