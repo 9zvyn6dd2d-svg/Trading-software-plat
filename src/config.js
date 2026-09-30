@@ -14,7 +14,7 @@ function str(name, fallback = '') {
 export function loadConfig() {
   return {
     port: num('PORT', 3000),
-    scanIntervalMs: num('SCAN_INTERVAL_SECONDS', 15) * 1000,
+    scanIntervalMs: num('SCAN_INTERVAL_SECONDS', 3) * 1000,
     staleAfterMs: num('STALE_AFTER_SECONDS', 120) * 1000,
     watchlist: str('WATCHLIST')
       .split(',')

@@ -22,6 +22,7 @@
     Connecting to scanner…
   </section>
 
+  <h2>Five-pillar scan</h2>
   <section class="toolbar">
     <label><input type="checkbox" id="onlyAll"> Only show 5 / 5 pillars</label>
     <span id="criteria" class="muted"></span>
@@ -47,11 +48,31 @@
     <p id="empty" class="empty"></p>
   </div>
 
+  <h2>High volume <span class="muted" id="hvCriteria"></span></h2>
+  <div class="table-wrap">
+    <table class="compact">
+      <thead>
+        <tr>
+          <th>Symbol</th>
+          <th class="num">Price</th>
+          <th class="num">% Chg</th>
+          <th class="num">Volume</th>
+          <th class="num">Avg volume</th>
+          <th class="num">RVOL</th>
+          <th>Last trade</th>
+        </tr>
+      </thead>
+      <tbody id="hvRows"></tbody>
+    </table>
+    <p id="hvEmpty" class="empty"></p>
+  </div>
+
   <section id="warnings" class="warnings"></section>
 
   <footer class="muted">
     <span id="provider"></span>
     <span id="scanned"></span>
+    <span id="calls"></span>
     Not financial advice. A stock only appears when its last trade is recent enough to count as live.
   </footer>
 

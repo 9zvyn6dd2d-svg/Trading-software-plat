@@ -29,6 +29,10 @@ header {
 }
 
 h1 { margin: 0; font-size: 22px; }
+h2 { margin: 20px 0 8px; font-size: 16px; }
+h2 .muted { font-weight: 400; font-size: 13px; margin-left: 6px; }
+table.compact { min-width: 620px; }
+.down { color: var(--bad); }
 .sub, .muted { color: var(--muted); }
 .sub { margin: 4px 0 0; }
 .meta { display: flex; gap: 10px; align-items: center; font-variant-numeric: tabular-nums; }

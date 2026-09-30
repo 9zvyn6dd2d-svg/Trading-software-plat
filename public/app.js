@@ -37,7 +37,7 @@ function fmtAge(ms) {
 
 function connectionLost() {
   if (!latest) return false;
-  const limit = Math.max(3 * (latest.scanIntervalMs ?? 15000), 20000);
+  const limit = Math.max(4 * (latest.scanIntervalMs ?? 3000), 10000);
   return Date.now() - lastMessageAt > limit || serverNow() - latest.scannedAt > limit;
 }
 
@@ -120,6 +120,39 @@ function renderRows() {
     .join('');
 }
 
+function lastTradeCell(r) {
+  const age = serverNow() - r.lastTradeAt;
+  const stale = age > latest.staleAfterMs;
+  return { stale, html: `${fmtTime(r.lastTradeAt)}<div class="${stale ? 'age-stale' : 'muted'}">${stale ? 'STALE · ' : ''}${fmtAge(age)}</div>` };
+}
+
+function renderHighVolume() {
+  const tbody = $('hvRows');
+  const empty = $('hvEmpty');
+  if (!latest || latest.status !== 'live' || connectionLost()) {
+    tbody.innerHTML = '';
+    empty.textContent = 'No current data to show.';
+    return;
+  }
+  const rows = latest.highVolume ?? [];
+  empty.textContent = rows.length ? '' : 'No stock in the price range is trading at high relative volume right now.';
+  tbody.innerHTML = rows
+    .map((r) => {
+      const t = lastTradeCell(r);
+      const chg = r.changePct === null ? '<span class="unknown">n/a</span>' : `<span class="${r.changePct >= 0 ? 'up' : 'down'}">${r.changePct >= 0 ? '+' : ''}${r.changePct.toFixed(1)}%</span>`;
+      return `<tr class="${t.stale ? 'stale' : ''}">
+        <td><span class="sym">${esc(r.symbol)}</span></td>
+        <td class="num">${t.stale ? '<span class="unknown">stale</span>' : '$' + r.price.toFixed(2)}</td>
+        <td class="num">${t.stale ? '—' : chg}</td>
+        <td class="num">${fmtNum(r.volume)}</td>
+        <td class="num">${fmtNum(r.avgVolume)}</td>
+        <td class="num">${r.rvol.toFixed(1)}x</td>
+        <td>${t.html}</td>
+      </tr>`;
+    })
+    .join('');
+}
+
 function renderMeta() {
   $('clock').textContent = new Date(serverNow()).toLocaleTimeString();
   if (!latest) return;
@@ -131,12 +164,15 @@ function renderMeta() {
     $('criteria').textContent =
       `$${c.minPrice}–$${c.maxPrice} · up ${c.minChangePct}%+ · RVOL ${c.minRvol}x+ · news in ${c.newsLookbackHours}h · float < ${fmtNum(c.maxFloat)}`;
   }
+  if (c) $('hvCriteria').textContent = `$${c.minPrice}–$${c.maxPrice} · RVOL ${c.minRvol}x+ · any % change`;
+  $('calls').textContent = Number.isFinite(latest.apiCallsPerMinute) ? `Data requests: ${latest.apiCallsPerMinute}/min` : '';
   $('warnings').innerHTML = (latest.warnings ?? []).map((w) => `<p>⚠ ${esc(w)}</p>`).join('');
 }
 
 function render() {
   renderBanner();
   renderRows();
+  renderHighVolume();
   renderMeta();
 }
 

@@ -4,7 +4,8 @@ import { marketSession, premarketOpen } from './market-session.js';
 // Runs one scan and returns a result the page can render as-is.
 //
 // status is one of:
-//   live            fresh quotes were found; `rows` holds the matches
+//   live            fresh quotes were found; `rows` holds the pillar matches
+//                   and `highVolume` the in-range stocks at MIN_RVOL or more
 //   stale           the feed answered but no quote traded recently enough
 //   error           the data provider could not be reached or refused us
 //   closed          outside 04:00-20:00 ET on a weekday, nothing trades
@@ -65,19 +66,25 @@ export async function runScan({ market, floats, criteria, watchlist = [], staleA
     };
   }
 
-  // Price and % change gate, on fresh quotes only.
+  // Fresh quotes in the price range feed both sections: the pillar scan (which
+  // also needs the % change gate) and the high-volume list.
+  const inRange = [];
   const gated = [];
   for (const q of fresh) {
     const changePct = q.prevClose ? ((q.price - q.prevClose) / q.prevClose) * 100 : null;
     const row = { ...q, changePct };
-    if (passesGate(evaluatePillars(row, criteria))) gated.push(row);
+    const evaluation = evaluatePillars(row, criteria);
+    if (evaluation.pillars.price !== true) continue;
+    inRange.push(row);
+    if (passesGate(evaluation)) gated.push(row);
   }
+  const rangeSymbols = inRange.map((r) => r.symbol);
   const gatedSymbols = gated.map((r) => r.symbol);
 
   // Enrichment. A failure here marks that pillar unknown and says why; it never
   // blocks the live price data from showing.
-  const settle = async (label, fn) => {
-    if (!gatedSymbols.length) return new Map();
+  const settle = async (label, symbols, fn) => {
+    if (!symbols.length) return new Map();
     try {
       return await fn();
     } catch (err) {
@@ -87,31 +94,33 @@ export async function runScan({ market, floats, criteria, watchlist = [], staleA
   };
   const sinceNews = new Date(startedAt - criteria.newsLookbackHours * 3_600_000);
   const [avgVolumes, premarketVolumes, news, floatMap] = await Promise.all([
-    settle('Average volume', () => market.getAverageVolumes(gatedSymbols)),
+    settle('Average volume', rangeSymbols, () => market.getAverageVolumes(rangeSymbols)),
     session === 'premarket'
-      ? settle('Pre-market volume', () => market.getVolumeSince(gatedSymbols, premarketOpen(new Date(startedAt))))
+      ? settle('Pre-market volume', rangeSymbols, () => market.getVolumeSince(rangeSymbols, premarketOpen(new Date(startedAt))))
       : Promise.resolve(null),
-    settle('News', () => market.getNews(gatedSymbols, sinceNews)),
+    settle('News', gatedSymbols, () => market.getNews(gatedSymbols, sinceNews)),
     floats?.isConfigured()
-      ? settle('Float', () => floats.getFloats(gatedSymbols))
+      ? settle('Float', gatedSymbols, () => floats.getFloats(gatedSymbols))
       : Promise.resolve(null),
   ]);
   if (!floats?.isConfigured() && gatedSymbols.length) {
     base.warnings.push('Float unavailable: FMP_API_KEY is not set, so the float pillar is unknown.');
   }
 
-  const rows = gated.map((r) => {
+  const volumeFields = (r) => {
     const volume = session === 'premarket' ? premarketVolumes?.get(r.symbol) ?? null : r.sessionVolume;
     const avgVolume = avgVolumes?.get(r.symbol) ?? null;
+    return { volume, avgVolume, rvol: volume !== null && avgVolume ? volume / avgVolume : null };
+  };
+
+  const rows = gated.map((r) => {
     const floatInfo = floatMap?.get(r.symbol);
     const row = {
       symbol: r.symbol,
       price: r.price,
       prevClose: r.prevClose,
       changePct: r.changePct,
-      volume,
-      avgVolume,
-      rvol: volume !== null && avgVolume ? volume / avgVolume : null,
+      ...volumeFields(r),
       float: floatInfo?.shares ?? null,
       floatAsOf: floatInfo?.asOf ?? null,
       news: news ? news.get(r.symbol) ?? [] : null,
@@ -120,6 +129,21 @@ export async function runScan({ market, floats, criteria, watchlist = [], staleA
     };
     return { ...row, ...evaluatePillars(row, criteria) };
   });
+
+  // High volume: any in-range stock trading at least MIN_RVOL times its normal
+  // volume, whatever its % change, busiest first.
+  const highVolume = inRange
+    .map((r) => ({
+      symbol: r.symbol,
+      price: r.price,
+      changePct: r.changePct,
+      ...volumeFields(r),
+      lastTradeAt: r.lastTradeAt,
+      ageMs: r.ageMs,
+    }))
+    .filter((r) => r.rvol !== null && r.rvol >= criteria.minRvol)
+    .sort((a, b) => b.rvol - a.rvol)
+    .slice(0, 25);
 
   return {
     ...base,
@@ -132,5 +156,6 @@ export async function runScan({ market, floats, criteria, watchlist = [], staleA
       ? `${rows.length} stock(s) up ${criteria.minChangePct}%+ between $${criteria.minPrice} and $${criteria.maxPrice}.`
       : `Live data found for ${fresh.length} symbols, but none are up ${criteria.minChangePct}%+ between $${criteria.minPrice} and $${criteria.maxPrice} right now.`,
     rows: rankResults(rows),
+    highVolume,
   };
 }

@@ -75,6 +75,8 @@ test('live scan: gates on price and % change, scores the rest, drops stale quote
   assert.equal(Math.round(top.changePct), 50);
   assert.equal(second.pillars.news, false);
   assert.equal(second.pillars.rvol, false);
+  // High volume ignores % change but keeps the price range and freshness rules.
+  assert.deepEqual(r.highVolume.map((x) => [x.symbol, x.rvol]), [['SLOW', 9], ['NEWS', 8]]);
 });
 
 test('pre-market uses volume since 04:00 ET instead of the daily bar', async () => {
@@ -112,4 +114,10 @@ test('watchlist symbols are always checked', async () => {
   });
   await scan(market, REGULAR, { watchlist: ['ZZZ', 'AAA'] });
   assert.deepEqual(asked.sort(), ['AAA', 'ZZZ']);
+});
+
+test('non-live results carry no high-volume rows', async () => {
+  const r = await scan(fakeMarket({ ABC: { price: 5, prevClose: 4, lastTradeAt: REGULAR - 600_000, sessionVolume: 9e6 } }), REGULAR);
+  assert.equal(r.status, 'stale');
+  assert.equal(r.highVolume, undefined);
 });

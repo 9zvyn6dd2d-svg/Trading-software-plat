@@ -104,3 +104,29 @@ test('news is grouped by symbol', async () => {
   assert.equal(news.get('AAA')[0].headline, 'Deal');
   assert.deepEqual(news.get('BBB'), []);
 });
+
+test('pre-market volume is fetched in full once, then only the last few minutes', async () => {
+  const calls = [];
+  let now = Date.parse('2026-09-30T12:00:00Z'); // 08:00 ET
+  const since = new Date('2026-09-30T08:00:00Z');
+  const p = new AlpacaProvider(
+    { keyId: 'k', secret: 's' },
+    {
+      now: () => now,
+      fetchImpl: fakeFetch(
+        {
+          '/v2/stocks/bars': (url) =>
+            url.searchParams.get('start') === since.toISOString()
+              ? { bars: { AAA: [{ t: 'a', v: 100 }, { t: 'b', v: 50 }] } }
+              : { bars: { AAA: [{ t: 'b', v: 80 }, { t: 'c', v: 10 }] } }, // bar b grew, c is new
+        },
+        calls,
+      ),
+    },
+  );
+  assert.equal((await p.getVolumeSince(['AAA'], since)).get('AAA'), 150);
+  now += 3_000;
+  assert.equal((await p.getVolumeSince(['AAA'], since)).get('AAA'), 190);
+  assert.equal(calls[1].url.searchParams.get('start'), new Date(now - 180_000).toISOString());
+  assert.equal(p.requestsLastMinute(), 2);
+});

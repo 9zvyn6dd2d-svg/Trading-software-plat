@@ -23,7 +23,15 @@ A stock appears once it passes price and % change. The other three pillars are s
 - Outside 4:00 AM to 8:00 PM ET on weekdays the page says the market is closed and no live data can be found.
 - With no API key set, the page says no real-time data can be found. The app never shows sample or mock data.
 
-The scanner re-scans every `SCAN_INTERVAL_SECONDS` (default 15) and pushes results to the page as they come in.
+## High volume section
+
+Below the five-pillar scan, a second table lists up to 25 stocks in the price range that are trading at `MIN_RVOL` (default 5x) or more of their normal volume, busiest first, whatever their % change. It catches stocks that are getting heavy volume before the price has moved 10%. The same freshness rules apply: stale quotes are left out and the table empties whenever data is unavailable.
+
+## Refresh rate
+
+Everything (prices, % change, volume, relative volume, news, both tables) refreshes every `SCAN_INTERVAL_SECONDS`, default **3 seconds**, and is pushed to the page as it comes in. Float is looked up once a day per stock because it doesn't change intraday, and the 30-day average volume is also computed once a day.
+
+Alpaca's free plan allows 200 requests a minute. A 3-second scan uses about 100 to 140 a minute in normal conditions (up to about 170 in a busy pre-market), and the current rate is shown at the bottom of the page. If Alpaca ever answers "rate limit reached", the page says data is unavailable, the scanner waits 15 seconds before trying again, and you can raise `SCAN_INTERVAL_SECONDS`.
 
 ## Setup
 

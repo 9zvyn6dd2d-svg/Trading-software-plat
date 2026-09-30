@@ -30,6 +30,7 @@ export function createScannerApp(config, { market, floats, now = () => Date.now(
     scanIntervalMs: config.scanIntervalMs,
     staleAfterMs: config.staleAfterMs,
     criteria: config.criteria,
+    apiCallsPerMinute: market.requestsLastMinute?.() ?? null,
   });
 
   function broadcast() {
@@ -56,8 +57,11 @@ export function createScannerApp(config, { market, floats, now = () => Date.now(
   }
 
   async function loop() {
-    await scanOnce();
-    if (!stopped) timer = setTimeout(loop, config.scanIntervalMs);
+    const result = await scanOnce();
+    // After a rate-limit error, give the provider's per-minute window time to clear.
+    const rateLimited = [result.message, ...(result.warnings ?? [])].some((m) => /HTTP 429/.test(m ?? ''));
+    const delay = rateLimited ? Math.max(config.scanIntervalMs, 15_000) : config.scanIntervalMs;
+    if (!stopped) timer = setTimeout(loop, delay);
   }
 
   async function serveStatic(req, res) {
@@ -102,7 +106,7 @@ export function createScannerApp(config, { market, floats, now = () => Date.now(
   // Heartbeat so the page can tell a quiet feed from a dead connection.
   const heartbeat = setInterval(() => {
     for (const res of clients) res.write(`event: heartbeat\ndata: ${now()}\n\n`);
-  }, 5_000);
+  }, 2_000);
 
   return {
     server,

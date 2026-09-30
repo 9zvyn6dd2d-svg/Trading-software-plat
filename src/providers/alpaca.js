@@ -28,6 +28,14 @@ export class AlpacaProvider {
     this.fetch = fetchImpl;
     this.now = now;
     this.avgVolumeCache = { day: null, values: new Map() };
+    this.requestTimes = [];
+  }
+
+  // Requests sent in the last minute. Alpaca's free plan allows 200.
+  requestsLastMinute() {
+    const cutoff = this.now() - 60_000;
+    this.requestTimes = this.requestTimes.filter((t) => t > cutoff);
+    return this.requestTimes.length;
   }
 
   get name() {
@@ -43,12 +51,18 @@ export class AlpacaProvider {
     for (const [k, v] of Object.entries(params)) {
       if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
     }
+    this.requestTimes.push(this.now());
     const res = await this.fetch(url, {
       headers: { 'APCA-API-KEY-ID': this.keyId, 'APCA-API-SECRET-KEY': this.secret },
     });
     if (!res.ok) {
       const body = await res.text().catch(() => '');
-      const hint = res.status === 401 || res.status === 403 ? ' (check ALPACA_API_KEY / ALPACA_API_SECRET and your data plan)' : '';
+      const hint =
+        res.status === 401 || res.status === 403
+          ? ' (check ALPACA_API_KEY / ALPACA_API_SECRET and your data plan)'
+          : res.status === 429
+            ? ' (rate limit reached; try a longer SCAN_INTERVAL_SECONDS)'
+            : '';
       throw new Error(`Alpaca ${url.pathname} returned HTTP ${res.status}${hint}${body ? `: ${body.slice(0, 200)}` : ''}`);
     }
     return res.json();
@@ -111,10 +125,25 @@ export class AlpacaProvider {
     return bars;
   }
 
-  // Volume traded since `since` (used for pre-market volume, which is not in the daily bar).
+  // Volume traded since `since` (used for pre-market volume, which is not in the
+  // daily bar). Minute bars are kept per symbol so each scan only re-fetches the
+  // last few minutes; bars are keyed by time, so a still-forming bar is replaced.
   async getVolumeSince(symbols, since) {
-    const bars = await this.getBars(symbols, { timeframe: '1Min', start: since.toISOString() });
-    return new Map([...bars].map(([s, list]) => [s, list.reduce((sum, b) => sum + (b.v ?? 0), 0)]));
+    const key = since.toISOString();
+    if (this.minuteCache?.key !== key) this.minuteCache = { key, bars: new Map() };
+    const cache = this.minuteCache.bars;
+    const fresh = symbols.filter((s) => !cache.has(s));
+    const known = symbols.filter((s) => cache.has(s));
+    const recentStart = new Date(Math.max(since.getTime(), this.now() - 3 * 60_000)).toISOString();
+    const [full, recent] = await Promise.all([
+      fresh.length ? this.getBars(fresh, { timeframe: '1Min', start: key }) : new Map(),
+      known.length ? this.getBars(known, { timeframe: '1Min', start: recentStart }) : new Map(),
+    ]);
+    for (const [symbol, list] of [...full, ...recent]) {
+      if (!cache.has(symbol)) cache.set(symbol, new Map());
+      for (const b of list) cache.get(symbol).set(b.t, b.v ?? 0);
+    }
+    return new Map(symbols.map((s) => [s, [...(cache.get(s)?.values() ?? [])].reduce((a, v) => a + v, 0)]));
   }
 
   // Average daily volume over the last ~30 completed sessions. Cached per Eastern day.
