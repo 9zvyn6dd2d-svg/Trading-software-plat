@@ -29,7 +29,7 @@ Below the five-pillar scan, a second table lists up to 25 stocks in the price ra
 
 ## Refresh rate
 
-Everything (prices, % change, volume, relative volume, news, both tables) refreshes every `SCAN_INTERVAL_SECONDS`, default **3 seconds**, and is pushed to the page as it comes in. Float is looked up once a day per stock because it doesn't change intraday, and the 30-day average volume is also computed once a day.
+Everything (prices, % change, volume, relative volume, news, both tables) refreshes every `SCAN_INTERVAL_SECONDS`, default **3 seconds**, and is pushed to the page as it comes in. Float is looked up once a day per stock because it doesn't change intraday, and the 30-day average volume is also computed once a day. If FMP refuses a float lookup (for example, a stock its free plan doesn't cover), that stock is not asked for again for 15 minutes, and a rate-limit answer pauses all float lookups for 15 minutes, so failures can't use up the 250 free lookups a day.
 
 Alpaca's free plan allows 200 requests a minute. A 3-second scan uses about 100 to 140 a minute in normal conditions (up to about 170 in a busy pre-market), and the current rate is shown at the bottom of the page. If Alpaca ever answers "rate limit reached", the page says data is unavailable, the scanner waits 15 seconds before trying again, and you can raise `SCAN_INTERVAL_SECONDS`.
 
