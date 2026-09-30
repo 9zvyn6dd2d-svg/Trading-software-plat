@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Momentum Scanner</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Momentum Scanner</h1>
+      <p class="sub">Ross Cameron's five pillars: price, % gain, relative volume, news, float</p>
+    </div>
+    <div class="meta">
+      <span id="session" class="pill">—</span>
+      <span id="clock"></span>
+    </div>
+  </header>
+
+  <section id="banner" class="banner banner-waiting" role="status" aria-live="polite">
+    Connecting to scanner…
+  </section>
+
+  <section class="toolbar">
+    <label><input type="checkbox" id="onlyAll"> Only show 5 / 5 pillars</label>
+    <span id="criteria" class="muted"></span>
+  </section>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Symbol</th>
+          <th class="num">Price</th>
+          <th class="num">% Chg</th>
+          <th class="num">Volume</th>
+          <th class="num">RVOL</th>
+          <th class="num">Float</th>
+          <th>News</th>
+          <th>Pillars</th>
+          <th>Last trade</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <p id="empty" class="empty"></p>
+  </div>
+
+  <section id="warnings" class="warnings"></section>
+
+  <footer class="muted">
+    <span id="provider"></span>
+    <span id="scanned"></span>
+    Not financial advice. A stock only appears when its last trade is recent enough to count as live.
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
