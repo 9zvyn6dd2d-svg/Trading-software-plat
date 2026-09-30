@@ -1,0 +1,14 @@
+{
+  "name": "momentum-scanner",
+  "version": "0.1.0",
+  "description": "Real-time small-cap momentum scanner based on Ross Cameron's five pillars of stock selection",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env src/server.js",
+    "test": "node --test"
+  }
+}
